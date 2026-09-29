@@ -9,9 +9,21 @@
 </head>
 <body>
   <div id="map"></div>
-  <div id="metrics"></div>
-  <div id="controls"></div>
-  <div id="legend"></div>
+
+  <!-- Narrow screens turn the panel overlay into a bottom sheet, which covers
+       the lower half of the map; this collapses it. Kept outside #panels so it
+       stays reachable once the sheet is hidden. -->
+  <button id="panels-toggle" type="button" aria-controls="panels" aria-expanded="true">Hide panels</button>
+
+  <!-- The three panels used to be positioned into three corners independently,
+       which overlapped as soon as the window was shorter or narrower than a
+       desktop monitor. They are now cells of one grid overlay, so the layout
+       itself guarantees they cannot collide. -->
+  <div id="panels">
+    <div id="metrics"></div>
+    <div id="controls"></div>
+    <div id="legend"></div>
+  </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/proj4@2.9.0/dist/proj4.js"></script>
@@ -21,6 +33,6 @@
   <script src="https://unpkg.com/georaster-layer-for-leaflet@4.1.2"></script>
   <!-- ?v= busts the browser cache: python's http.server sends no cache
        headers, so edits to app.js could otherwise be silently ignored. -->
-  <script src="js/app.js?v=6"></script>
+  <script src="js/app.js?v=7"></script>
 </body>
 </html>

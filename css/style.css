@@ -17,31 +17,118 @@ html, body {
   --bad: #b3261e;
 }
 
-#controls, #legend, #metrics {
+/* --- panel overlay ------------------------------------------------------
+   One grid over the whole map rather than three independently positioned
+   corners. Each panel owns a cell, so no combination of window width and
+   height can make two of them overlap — the previous absolute placement
+   collided on laptop heights (controls running into the legend) and on phone
+   widths (metrics running into controls).
+
+   The overlay ignores the pointer so the map stays pannable in the gaps
+   between panels; the panels themselves take it back. */
+#panels {
   position: absolute;
+  inset: 0;
   z-index: 1000;
+  display: grid;
+  /* minmax(0, …) on every track: tracks may shrink below their content, which
+     is what turns an over-tall panel into a scrolling one instead of one that
+     spills off screen. */
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr) minmax(0, auto);
+  grid-template-rows: minmax(0, auto) minmax(0, 1fr) minmax(0, auto);
+  gap: 10px;
+  padding: 10px;
+  box-sizing: border-box;
+  pointer-events: none;
+}
+
+#controls, #legend, #metrics {
   background: var(--surface);
-  padding: 10px 14px;
   border-radius: 6px;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  padding: 10px 14px;
+  box-sizing: border-box;
   font-size: 13px;
   color: var(--text-primary);
+  pointer-events: auto;
+  /* align-self keeps a short panel at its content height instead of letting
+     the grid stretch it into a tall empty box; max-height: 100% then resolves
+     against the grid area, so tall content scrolls inside the cell. */
+  align-self: start;
+  min-height: 0;
+  max-height: 100%;
   overflow-y: auto;
 }
 
-/* Three corners, so the wider metrics panel cannot collide with the controls
-   or the legend the way two right-hand panels used to. */
-#metrics  { top: 10px; left: 10px; width: 310px; max-height: calc(100vh - 20px); }
-#controls { top: 10px; right: 10px; width: 250px; max-height: calc(100vh - 20px); }
-#legend   { bottom: 20px; right: 10px; min-width: 150px; max-width: 240px; max-height: 60vh; }
+/* Metrics owns its own column, so it spans every row and may use the full
+   height — the rows exist to separate the two right-hand panels, not to cap
+   it. Widths scale with the viewport between a legible floor and the width the
+   content was designed for.
 
-/* Narrow windows: the panel narrows and shares the height, but is never
-   hidden — a metrics panel that silently disappears below some window width
-   just looks broken. */
-@media (max-width: 900px) {
-  #metrics  { width: 250px; max-height: 56vh; }
-  #controls { width: 210px; max-height: 40vh; }
-  #legend   { max-height: 34vh; }
+   The rows are left to the grid rather than given vh caps: on a short window
+   the free height is shared out between the controls and the legend up to each
+   one's content height, so the legend stays fully readable and only the taller
+   controls list scrolls. */
+#metrics  { grid-column: 1; grid-row: 1 / -1; width: clamp(240px, 26vw, 330px); }
+#controls { grid-column: 3; grid-row: 1; width: clamp(196px, 19vw, 250px); }
+#legend   { grid-column: 3; grid-row: 3; min-width: 150px; max-width: 240px; }
+
+/* Phones, small tablets and narrow windows: side-by-side panels cannot both
+   stay legible next to a usable map, so the overlay becomes one scrollable
+   bottom sheet and the map keeps the upper part of the screen. Controls first —
+   they are what gets used most — then the legend, then the metrics read-out. */
+@media (max-width: 860px) {
+  #panels {
+    inset: auto 0 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px;
+    max-height: 60vh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    pointer-events: auto;
+  }
+  #panels.is-collapsed { display: none; }
+
+  /* flex: none is what makes this work: as shrinkable flex items the panels
+     were squeezed below their content height and their content spilled out
+     over the panel below. Each keeps its full height and the sheet scrolls. */
+  #metrics, #controls, #legend {
+    flex: none;
+    width: auto;
+    min-width: 0;
+    max-width: none;
+    max-height: none;
+    overflow-y: visible;
+  }
+  #controls { order: 1; }
+  #legend   { order: 2; }
+  #metrics  { order: 3; }
+}
+
+/* Only meaningful once the overlay is a bottom sheet; on wider screens the
+   panels leave the map usable and there is nothing to collapse. */
+#panels-toggle {
+  display: none;
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1001;
+  background: var(--surface);
+  color: var(--text-primary);
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  padding: 7px 11px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+#panels-toggle:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 2px; }
+
+@media (max-width: 860px) {
+  #panels-toggle { display: block; }
 }
 
 /* --- controls ----------------------------------------------------------- */
@@ -115,7 +202,13 @@ html, body {
 /* Wide windows: the panel widens and the three risk charts pair up, so the
    whole hazard → exposure → risk story fits without scrolling. */
 @media (min-width: 1500px) {
-  #metrics { width: 560px; }
+  #metrics { width: clamp(520px, 37vw, 620px); }
+  .metric-grid { grid-template-columns: 1fr 1fr; }
+}
+
+/* Bottom sheet: the panel is now as wide as the screen, so the risk charts can
+   pair up again on anything wider than a small phone. */
+@media (max-width: 860px) and (min-width: 560px) {
   .metric-grid { grid-template-columns: 1fr 1fr; }
 }
 .metric-head { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; }
@@ -172,6 +265,16 @@ html, body {
   text-align: left;
   cursor: pointer;
 }
+/* Touch layout: a 16px row is an unreliable tap target, and the fixed label
+   column crowds the bar on the narrowest phones. */
+@media (max-width: 860px) {
+  .bar-row { padding: 5px 3px; }
+  #controls label { margin: 7px 0; }
+}
+@media (max-width: 380px) {
+  .bar-row { grid-template-columns: 70px 1fr 48px; gap: 4px; }
+}
+
 .bar-row:hover { background: #f2f1ee; }
 .bar-row.is-selected { background: #eef4fd; }
 .bar-row:focus-visible { outline: 2px solid var(--text-primary); outline-offset: -2px; }

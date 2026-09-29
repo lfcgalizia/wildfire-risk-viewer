@@ -9,9 +9,14 @@
 </head>
 <body>
   <div id="map"></div>
-  <div id="metrics"></div>
-  <div id="controls"></div>
-  <div id="legend"></div>
+  <!-- Mirrors index.html: the panels are cells of the #panels grid overlay, so
+       this harness measures the layout the app actually renders. -->
+  <button id="panels-toggle" type="button" aria-controls="panels" aria-expanded="true">Hide panels</button>
+  <div id="panels">
+    <div id="metrics"></div>
+    <div id="controls"></div>
+    <div id="legend"></div>
+  </div>
 
 <script>
 window.__log = [];

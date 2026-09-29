@@ -1,6 +1,6 @@
 // Printed on load so it is possible to tell from the console whether the
 // browser is running the current file or a cached older copy.
-const BUILD = "2026-09-29 ael-reconciled";
+const BUILD = "2026-09-29 responsive-panels";
 console.info(`[wildfire-viewer] build ${BUILD}`);
 
 const SCENARIOS = [
@@ -59,7 +59,7 @@ const vectorRenderer = L.canvas({ padding: 0.5 });
 // exposure and risk fills. `fill` picks what the exposure polygons encode.
 // ---------------------------------------------------------------------------
 const MODES = [
-  { id: "hazard",       label: "Hazard — burn probability",  raster: "bp",    fill: null },
+  { id: "hazard",       label: "Hazard — annual burn probability", raster: "bp", fill: null },
   { id: "hazard_delta", label: "Hazard — change vs baseline", raster: "delta", fill: null },
   { id: "exposure",     label: "Exposure — assets at risk",  raster: null,    fill: "asset" },
   { id: "risk",         label: "Risk — expected annual loss", raster: null,   fill: "ael" },
@@ -248,7 +248,7 @@ function buildLegend() {
   if (mode.id === "hazard_delta") {
     const rows = DELTA_CLASSES.map(cls => legendRow(cls.color, cls.label)).join("");
     el.innerHTML = `
-      <strong>Change in burn probability</strong>
+      <strong>Change in annual burn probability</strong>
       <div class="sub">vs ${scenarioLabel(BASELINE_ID).toLowerCase()}</div>
       <div class="classes">${rows}</div>
       <div class="note">pp = percentage points of annual burn probability.</div>`;
@@ -279,8 +279,8 @@ function buildLegend() {
       <strong>Expected annual loss</strong>
       <div class="sub">euros per year, per asset</div>
       <div class="classes">${rows}</div>
-      <div class="note">Burn probability × value at risk. Assets with zero modelled
-        burn probability are drawn as empty outlines.</div>`;
+      <div class="note">Annual burn probability × value at risk. Assets with zero
+        modelled annual burn probability are drawn as empty outlines.</div>`;
     return;
   }
 
@@ -519,7 +519,7 @@ function bindExposurePopup(kind) {
         kind === "Forest stand" && p.area_ha != null ? `Area: ${num(p.area_ha, 1)} ha` : null,
         `Value at risk: ${eur(v)}`,
         `Expected annual loss: ${eur(a)}`,
-        v > 0 ? `Implied burn probability: ${(a / v * 100).toFixed(2)}%` : null,
+        v > 0 ? `Implied annual burn probability: ${(a / v * 100).toFixed(2)}%` : null,
         `<span class="pop-sub">${scenarioLabel(currentScenarioId)}</span>`,
       ].filter(Boolean);
       return rows.join("<br/>");
@@ -647,7 +647,7 @@ function deltaLine(saved, format, { pct = null } = {}) {
 // hides it. Every metric here is better when lower.
 const METRICS = [
   {
-    group: "hazard", title: "Mean burn probability", unit: "%/yr",
+    group: "hazard", title: "Mean annual burn probability", unit: "%/yr",
     get: s => s.hazard.mean_bp * 100, fmt: v => `${v.toFixed(2)}%`,
     // The gap between two percentages is percentage points, not a percentage.
     deltaFmt: v => `${v.toFixed(2)} pp`,
@@ -716,10 +716,26 @@ function metricsPanel() {
   if (!el) {
     el = document.createElement("div");
     el.id = "metrics";
-    document.body.appendChild(el);
+    // Into the panel overlay when it exists, so the created panel takes part in
+    // the responsive grid rather than floating over the map on its own.
+    (document.getElementById("panels") || document.body).appendChild(el);
     console.info("[metrics] #metrics missing from the page — created it; your index.html may be cached");
   }
   return el;
+}
+
+// On narrow screens the panels become a bottom sheet over the lower half of
+// the map, so there has to be a way to get the map back.
+function wirePanelToggle() {
+  const button = document.getElementById("panels-toggle");
+  const panels = document.getElementById("panels");
+  if (!button || !panels) return;
+
+  button.addEventListener("click", () => {
+    const collapsed = panels.classList.toggle("is-collapsed");
+    button.setAttribute("aria-expanded", String(!collapsed));
+    button.textContent = collapsed ? "Show panels" : "Hide panels";
+  });
 }
 
 function renderMetrics() {
@@ -748,7 +764,7 @@ function renderMetrics() {
     </div>
 
     <section class="block">
-      <h3>Hazard<span class="block-def">burn probability of the landscape</span></h3>
+      <h3>Hazard<span class="block-def">annual burn probability of the landscape</span></h3>
       ${chartsFor("hazard")}
       <div class="split">${s.hazard.area_high_hazard_pct.toFixed(1)}% of the area at ≥ 5%/yr</div>
     </section>
@@ -777,8 +793,8 @@ function renderMetrics() {
     </section>
 
     <div class="panel-note">
-      “Buildings affected” is an expected count — the sum of per-building burn
-      probability — not a headcount of distinct buildings.
+      “Buildings affected” is an expected count — the sum of per-building annual
+      burn probability — not a headcount of distinct buildings.
     </div>`;
 
   wireChart();
@@ -866,6 +882,7 @@ async function loadStats() {
 }
 
 (async function init() {
+  wirePanelToggle();
   buildControls();
   buildLegend();
   renderMetrics();

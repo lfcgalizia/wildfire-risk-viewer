@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>layout probe</title>
+<style>
+  html, body { margin: 0; }
+  #stage { position: absolute; left: 0; top: 0; }
+  iframe { border: 0; display: block; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script>
+// Layout-only probe. Each viewport size gets a real iframe of index.html —
+// an iframe has its own viewport, so the media queries and vh/vw units in
+// style.css resolve exactly as they would in a window that size.
+window.__log = [];
+const log = (...a) => window.__log.push(a.map(String).join(' '));
+window.onerror = (m, s, l) => log('WINDOW_ERROR:', m, '@', s + ':' + l);
+window.addEventListener('unhandledrejection', e => log('UNHANDLED_REJECTION:', e.reason));
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const post = (p, b) => fetch(p, { method: 'POST', body: b });
+
+const SIZES = [
+  { name: 'desktop-2k',      w: 1920, h: 1080 },
+  { name: 'desktop-1440',    w: 1440, h: 900  },
+  { name: 'laptop-1366x768', w: 1366, h: 768  },
+  { name: 'laptop-1280x800', w: 1280, h: 800  },
+  { name: 'small-laptop',    w: 1024, h: 640  },
+  { name: 'wide-but-short',  w: 1440, h: 700  },
+  { name: 'narrow-window',   w: 900,  h: 700  },
+  { name: 'tablet-portrait', w: 768,  h: 1024 },
+  { name: 'phone-landscape', w: 740,  h: 360  },
+  { name: 'phone-390x844',   w: 390,  h: 844  },
+  { name: 'phone-360x640',   w: 360,  h: 640  },
+];
+
+const IDS = ['metrics', 'controls', 'legend'];
+const round = n => Math.round(n);
+
+function boxes(doc) {
+  const out = {};
+  IDS.forEach(id => {
+    const el = doc.getElementById(id);
+    if (!el || el.offsetParent === null) { out[id] = null; return; }
+    const b = el.getBoundingClientRect();
+    out[id] = { id, x: round(b.x), y: round(b.y), w: round(b.width), h: round(b.height),
+                right: round(b.right), bottom: round(b.bottom) };
+  });
+  return out;
+}
+
+const hit = (a, b) => !(a.right <= b.x || b.right <= a.x || a.bottom <= b.y || b.bottom <= a.y);
+
+async function waitFor(cond, label, timeout) {
+  const t0 = Date.now();
+  while (Date.now() - t0 < timeout) {
+    try { if (cond()) return true; } catch (e) { /* iframe still navigating */ }
+    await sleep(500);
+  }
+  log('  TIMEOUT: ' + label);
+  return false;
+}
+
+async function run(size) {
+  const frame = document.createElement('iframe');
+  frame.width = size.w;
+  frame.height = size.h;
+  frame.src = 'index.html?probe=' + size.name;
+  document.getElementById('stage').appendChild(frame);
+
+  const doc = () => frame.contentDocument;
+  await waitFor(() => doc() && doc().getElementById('panels'), size.name + ' boot', 30000);
+  // Panel content, not the raster: the metrics panel is the tall one and it is
+  // only at full height once scenario_stats.json has rendered into it.
+  await waitFor(() => doc().querySelector('#metrics .metric, #metrics .panel-note'),
+                size.name + ' metrics render', 60000);
+  await sleep(2500);
+
+  const win = frame.contentWindow;
+  log(`=== ${size.name}  ${size.w}x${size.h}  (inner ${win.innerWidth}x${win.innerHeight}) ===`);
+
+  const b = boxes(doc());
+  IDS.forEach(id => {
+    const x = b[id];
+    log('  ' + id.padEnd(9) + (x ? `x=${x.x} y=${x.y} w=${x.w} h=${x.h} right=${x.right} bottom=${x.bottom}`
+                                 : 'NOT VISIBLE'));
+  });
+
+  // 1. No two panels may overlap.
+  let overlaps = 0;
+  for (let i = 0; i < IDS.length; i++) {
+    for (let j = i + 1; j < IDS.length; j++) {
+      const a = b[IDS[i]], c = b[IDS[j]];
+      if (!a || !c) continue;
+      const o = hit(a, c);
+      if (o) { overlaps++; log(`  OVERLAP ${IDS[i]}/${IDS[j]} = true`); }
+    }
+  }
+  log('  overlaps = ' + overlaps + (overlaps === 0 ? ' OK' : ' FAIL'));
+
+  // 2. Nothing may sit outside the viewport horizontally, or above it. In sheet
+  //    mode a panel may extend below the fold — the sheet is a scroller, so
+  //    that is reachable; the sheet itself must still be inside the viewport.
+  const sheetEl = doc().getElementById('panels');
+  const sheetBox = sheetEl.getBoundingClientRect();
+  let offscreen = 0;
+  IDS.forEach(id => {
+    const x = b[id];
+    if (!x) { offscreen++; log(`  MISSING ${id}`); return; }
+    const scrolls = sheetEl.scrollHeight > sheetEl.clientHeight + 1;
+    const bad = x.x < -1 || x.right > win.innerWidth + 1 || x.y < -1
+                || (!scrolls && x.bottom > win.innerHeight + 1);
+    if (bad) { offscreen++; log(`  OFFSCREEN ${id}`); }
+  });
+  const sheetBad = sheetBox.x < -1 || sheetBox.y < -1
+                   || sheetBox.right > win.innerWidth + 1 || sheetBox.bottom > win.innerHeight + 1;
+  if (sheetBad) { offscreen++; log('  OFFSCREEN #panels'); }
+  log('  offscreen/missing = ' + offscreen + (offscreen === 0 ? ' OK' : ' FAIL'));
+
+  // 2b. Whatever is below the fold has to be reachable by scrolling.
+  if (sheetEl.scrollHeight > sheetEl.clientHeight + 1) {
+    sheetEl.scrollTop = sheetEl.scrollHeight;
+    await sleep(300);
+    const last = boxes(doc());
+    const lowest = Math.max(...IDS.map(id => last[id] ? last[id].bottom : -Infinity));
+    log(`  scrolled to end: lowest panel bottom = ${lowest} of ${win.innerHeight} `
+        + (lowest <= win.innerHeight + 1 ? 'OK' : 'FAIL'));
+    sheetEl.scrollTop = 0;
+    await sleep(200);
+  }
+
+  // 3. Tall content must scroll inside its panel, not spill out of it. In the
+  //    bottom sheet the panels are not clipped at all (the sheet scrolls), so
+  //    a clipped panel there means content is overflowing onto its neighbour.
+  const sheet = size.w <= 860;
+  IDS.forEach(id => {
+    const el = doc().getElementById(id);
+    if (!el) return;
+    const clipped = el.scrollHeight > el.clientHeight + 1;
+    const scrollable = el.scrollHeight > el.clientHeight + 1 && getComputedStyle(el).overflowY === 'auto';
+    log(`  ${id.padEnd(9)} scrollH=${el.scrollHeight} clientH=${el.clientHeight} clipped=${clipped}`
+        + (clipped && !scrollable ? '  SPILLS (FAIL)' : ''));
+  });
+  if (sheet) {
+    const sh = doc().getElementById('panels');
+    log(`  sheet     scrollH=${sh.scrollHeight} clientH=${sh.clientHeight} scrolls=${sh.scrollHeight > sh.clientHeight + 1}`);
+  }
+
+  // 4. Some of the map has to be left over.
+  const used = IDS.map(id => b[id]).filter(Boolean);
+  const leftBand = Math.min(...used.map(x => x.x));
+  const sheetTop = Math.min(...used.map(x => x.y));
+  const mapFree = sheet
+    ? `map height above panels = ${sheetTop}px of ${win.innerHeight}`
+    : `map width between panels = ${win.innerWidth - used.reduce((s, x) => s + x.w, 0) - 30}px (approx)`;
+  log('  ' + mapFree + ' leftmost=' + leftBand);
+
+  // 5. Collapse toggle: only on narrow screens, and it must free the map.
+  const tgl = doc().getElementById('panels-toggle');
+  const tglVisible = tgl && tgl.offsetParent !== null;
+  log('  toggle visible = ' + !!tglVisible + (sheet ? ' (expect true)' : ' (expect false)'));
+  if (tglVisible) {
+    tgl.click();
+    await sleep(400);
+    const after = boxes(doc());
+    log('  after collapse: panels visible = ' + IDS.filter(id => after[id]).length + ' (expect 0)'
+        + ', button = "' + tgl.textContent.trim() + '"');
+    tgl.click();
+    await sleep(400);
+    log('  after expand:   panels visible = ' + IDS.filter(id => boxes(doc())[id]).length + ' (expect 3)');
+  }
+
+  // 6. Wording.
+  const modeLabels = [...doc().querySelectorAll('#controls label')]
+    .map(l => l.textContent.trim()).filter(t => /Hazard|Exposure|Risk/.test(t));
+  log('  mode labels = ' + JSON.stringify(modeLabels));
+  log('  legend title = "' + (doc().querySelector('#legend strong') || {}).textContent + '"');
+  log('  metric titles = ' + JSON.stringify([...doc().querySelectorAll('#metrics .metric-title')].map(e => e.textContent.trim())));
+  log('  hazard block def = "' + ((doc().querySelector('#metrics .block-def') || {}).textContent || '') + '"');
+
+  frame.remove();
+}
+
+(async () => {
+  try {
+    for (const size of SIZES) await run(size);
+  } catch (e) {
+    log('HARNESS_ERROR: ' + e + ' ' + (e && e.stack));
+  }
+  await post('/report', window.__log.join('\n'));
+  await post('/done', 'done');
+})();
+</script>
+</body>
+</html>
