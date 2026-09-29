@@ -1,0 +1,200 @@
+{
+  "meta": {
+    "baseline": "bau",
+    "generated": "2026-09-29",
+    "currency": "EUR",
+    "high_hazard_threshold": 0.05,
+    "material_change": 0.001
+  },
+  "exposure": {
+    "buildings": {
+      "count": 26462,
+      "value_eur": 2085734840.0,
+      "unit_value_eur": {
+        "uniform": true,
+        "distinct": 1,
+        "value": 78820.0
+      }
+    },
+    "forest": {
+      "stands": 540,
+      "area_ha": 10475.14,
+      "value_eur": 35091718.05,
+      "unit_value_eur_per_ha": {
+        "uniform": true,
+        "distinct": 1,
+        "value": 3350.0
+      }
+    }
+  },
+  "scenarios": {
+    "bau": {
+      "hazard": {
+        "mean_bp": 0.03513998386221654,
+        "max_bp": 0.10510582476854324,
+        "area_high_hazard_pct": 31.297918948521357,
+        "mean_delta": 0.0,
+        "area_reduced_pct": 0.0,
+        "area_increased_pct": 0.0,
+        "max_reduction": -0.0
+      },
+      "risk": {
+        "buildings_affected": 863.33,
+        "forest_area_burned_ha": 387.37,
+        "ael_buildings_eur": 68048010.17,
+        "ael_forest_eur": 1297681.84,
+        "ael_total_eur": 69345692.01
+      },
+      "vs_baseline": {
+        "buildings_affected": 0.0,
+        "forest_area_burned_ha": 0.0,
+        "ael_total_eur": 0.0,
+        "ael_total_pct": 0.0
+      }
+    },
+    "primary_full": {
+      "hazard": {
+        "mean_bp": 0.028777675807396253,
+        "max_bp": 0.08954864740371704,
+        "area_high_hazard_pct": 21.366070341973955,
+        "mean_delta": -0.00636230269446969,
+        "area_reduced_pct": 27.534177112490365,
+        "area_increased_pct": 0.0,
+        "max_reduction": 0.10482124239206314
+      },
+      "risk": {
+        "buildings_affected": 617.58,
+        "forest_area_burned_ha": 308.27,
+        "ael_buildings_eur": 48677406.62,
+        "ael_forest_eur": 1032717.37,
+        "ael_total_eur": 49710123.99
+      },
+      "vs_baseline": {
+        "buildings_affected": 245.75,
+        "forest_area_burned_ha": 79.1,
+        "ael_total_eur": 19635568.02,
+        "ael_total_pct": 28.32
+      }
+    },
+    "primary_partial": {
+      "hazard": {
+        "mean_bp": 0.03414952027174354,
+        "max_bp": 0.10482124239206314,
+        "area_high_hazard_pct": 29.893513447730314,
+        "mean_delta": -0.0009904596954584122,
+        "area_reduced_pct": 22.24514218490122,
+        "area_increased_pct": 0.0,
+        "max_reduction": 0.02971087023615837
+      },
+      "risk": {
+        "buildings_affected": 826.32,
+        "forest_area_burned_ha": 375.16,
+        "ael_buildings_eur": 65130701.05,
+        "ael_forest_eur": 1256795.1,
+        "ael_total_eur": 66387496.15
+      },
+      "vs_baseline": {
+        "buildings_affected": 37.01,
+        "forest_area_burned_ha": 12.21,
+        "ael_total_eur": 2958195.86,
+        "ael_total_pct": 4.27
+      }
+    },
+    "secondary_full": {
+      "hazard": {
+        "mean_bp": 0.0337670441868484,
+        "max_bp": 0.10510582476854324,
+        "area_high_hazard_pct": 29.321122875339746,
+        "mean_delta": -0.0013729407219216228,
+        "area_reduced_pct": 16.772747555880084,
+        "area_increased_pct": 0.0,
+        "max_reduction": 0.05841195583343506
+      },
+      "risk": {
+        "buildings_affected": 423.26,
+        "forest_area_burned_ha": 289.95,
+        "ael_buildings_eur": 33361324.34,
+        "ael_forest_eur": 971334.51,
+        "ael_total_eur": 34332658.85
+      },
+      "vs_baseline": {
+        "buildings_affected": 440.07,
+        "forest_area_burned_ha": 97.42,
+        "ael_total_eur": 35013033.16,
+        "ael_total_pct": 50.49
+      }
+    },
+    "secondary_partial": {
+      "hazard": {
+        "mean_bp": 0.03435625392986086,
+        "max_bp": 0.10510582476854324,
+        "area_high_hazard_pct": 30.06551458358687,
+        "mean_delta": -0.0007837340817786753,
+        "area_reduced_pct": 14.358038213459901,
+        "area_increased_pct": 0.0,
+        "max_reduction": 0.030100787058472633
+      },
+      "risk": {
+        "buildings_affected": 599.65,
+        "forest_area_burned_ha": 332.86,
+        "ael_buildings_eur": 47264283.74,
+        "ael_forest_eur": 1115072.82,
+        "ael_total_eur": 48379356.56
+      },
+      "vs_baseline": {
+        "buildings_affected": 263.68,
+        "forest_area_burned_ha": 54.51,
+        "ael_total_eur": 20966335.45,
+        "ael_total_pct": 30.23
+      }
+    },
+    "combined_full": {
+      "hazard": {
+        "mean_bp": 0.027724932637747963,
+        "max_bp": 0.0902286022901535,
+        "area_high_hazard_pct": 20.73262747961543,
+        "mean_delta": -0.007415051106363535,
+        "area_reduced_pct": 30.382743093586466,
+        "area_increased_pct": 0.0,
+        "max_reduction": 0.10482124239206314
+      },
+      "risk": {
+        "buildings_affected": 196.02,
+        "forest_area_burned_ha": 189.11,
+        "ael_buildings_eur": 15449905.19,
+        "ael_forest_eur": 633527.73,
+        "ael_total_eur": 16083432.92
+      },
+      "vs_baseline": {
+        "buildings_affected": 667.31,
+        "forest_area_burned_ha": 198.26,
+        "ael_total_eur": 53262259.09,
+        "ael_total_pct": 76.81
+      }
+    },
+    "combined_partial": {
+      "hazard": {
+        "mean_bp": 0.033667803315534865,
+        "max_bp": 0.10510582476854324,
+        "area_high_hazard_pct": 29.003691533812017,
+        "mean_delta": -0.0014721860643476248,
+        "area_reduced_pct": 22.433369843008396,
+        "area_increased_pct": 0.0,
+        "max_reduction": 0.031817205250263214
+      },
+      "risk": {
+        "buildings_affected": 552.79,
+        "forest_area_burned_ha": 318.25,
+        "ael_buildings_eur": 43570643.14,
+        "ael_forest_eur": 1066146.6,
+        "ael_total_eur": 44636789.74
+      },
+      "vs_baseline": {
+        "buildings_affected": 310.54,
+        "forest_area_burned_ha": 69.12,
+        "ael_total_eur": 24708902.27,
+        "ael_total_pct": 35.63
+      }
+    }
+  }
+}

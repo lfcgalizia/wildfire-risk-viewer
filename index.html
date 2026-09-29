@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Wildfire Risk Reduction Viewer — Central Portugal</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="map"></div>
+  <div id="metrics"></div>
+  <div id="controls"></div>
+  <div id="legend"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/proj4@2.9.0/dist/proj4.js"></script>
+  <!-- Versions pinned: these were previously unpinned, so an upstream release
+       could change the viewer's behaviour without any local edit. -->
+  <script src="https://unpkg.com/georaster@1.6.0"></script>
+  <script src="https://unpkg.com/georaster-layer-for-leaflet@4.1.2"></script>
+  <!-- ?v= busts the browser cache: python's http.server sends no cache
+       headers, so edits to app.js could otherwise be silently ignored. -->
+  <script src="js/app.js?v=6"></script>
+</body>
+</html>

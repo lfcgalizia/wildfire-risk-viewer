@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>diag</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="map"></div>
+  <div id="controls"></div>
+  <div id="legend"></div>
+
+<script>
+window.__log = [];
+const log = (...a) => window.__log.push(a.map(String).join(' '));
+window.onerror = (m, s, l, c, e) => log('WINDOW_ERROR:', m, '@', s + ':' + l, e && e.stack);
+window.addEventListener('unhandledrejection', e => log('UNHANDLED_REJECTION:', e.reason, e.reason && e.reason.stack));
+const _err = console.error; console.error = (...a) => { log('CONSOLE_ERROR:', ...a.map(String)); _err(...a); };
+const _fetch = window.fetch;
+window.fetch = (...args) => { log('FETCH:', args[0]); return _fetch(...args); };
+</script>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/proj4@2.9.0/dist/proj4.js"></script>
+<script src="https://unpkg.com/georaster@1.6.0"></script>
+<script src="https://unpkg.com/georaster-layer-for-leaflet@4.1.2"></script>
+<script src="js/app.js"></script>
+
+<script>
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// Each tif has a distinct max, so the displayed raster is identifiable.
+const FINGERPRINT = {
+  '0.10303': 'bau2', '0.08939': 'pfb', '0.10463': 'pfb_partial',
+  '0.10487': 'sfb or sfb_partial', '0.09006': 'pfb_sfb', '0.10482': 'pfb_sfb_partial',
+};
+
+function rasterState() {
+  const out = [];
+  Object.values(map._layers).forEach(l => {
+    const gr = l.options && l.options.georaster;
+    if (!gr) return;
+    const key = gr.maxs && gr.maxs[0] != null ? Number(gr.maxs[0]).toFixed(5) : '?';
+    const container = l._container;
+    out.push(`  id=${l._leaflet_id} raster=${FINGERPRINT[key] || key} onMap=${map.hasLayer(l)} canvasTiles=${container ? container.querySelectorAll('canvas').length : 'no-container'}`);
+  });
+  return out.length ? out.join('\n') : '  (none)';
+}
+
+function viewState() {
+  const c = map.getCenter(), b = map.getBounds();
+  return `  center=[${c.lat.toFixed(4)}, ${c.lng.toFixed(4)}] zoom=${map.getZoom()} bounds=[${b.getSouth().toFixed(3)},${b.getWest().toFixed(3)} .. ${b.getNorth().toFixed(3)},${b.getEast().toFixed(3)}]`;
+}
+
+async function snapshot(title) {
+  log('=== ' + title + ' ===');
+  log('view:\n' + viewState());
+  log('currentScenarioId=' + (typeof currentScenarioId !== 'undefined' ? currentScenarioId : 'UNDEFINED'));
+  log('rasterLayers:\n' + rasterState());
+  log('status="' + ((document.getElementById('status') || {}).textContent || '') + '"');
+}
+
+(async () => {
+  try {
+    await sleep(20000);           // real time: let the first COG parse and render
+    await snapshot('after init');
+
+    const radios = document.querySelectorAll('input[name=scenario]');
+    log('radios=' + radios.length + ' overlayBoxes=' + document.querySelectorAll('input[name=overlay]').length);
+
+    log('>>> click radio[1] = ' + radios[1].value);
+    radios[1].click();
+    await sleep(25000);
+    await snapshot('after scenario click');
+
+    const box = document.querySelector('input[name=overlay][value=forest]');
+    log('>>> untick forest overlay');
+    box.click();
+    await sleep(3000);
+    log('forestLayer on map after untick = ' + map.hasLayer(forestLayer));
+    box.click();
+    await sleep(3000);
+    log('forestLayer on map after retick  = ' + map.hasLayer(forestLayer));
+  } catch (e) {
+    log('HARNESS_ERROR: ' + e + ' ' + e.stack);
+  }
+  await _fetch('/report', { method: 'POST', body: window.__log.join('\n') });
+})();
+</script>
+</body>
+</html>

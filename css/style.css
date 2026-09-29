@@ -1,0 +1,221 @@
+html, body {
+  margin: 0;
+  height: 100%;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+#map { position: absolute; inset: 0; }
+
+/* Ink and surface roles, so the panels are written against roles rather than
+   raw hex. Panels sit on white, which is what the palette was validated on. */
+:root {
+  --surface: #ffffff;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #898781;
+  --hairline: #e1e0d9;
+  --good: #006300;
+  --bad: #b3261e;
+}
+
+#controls, #legend, #metrics {
+  position: absolute;
+  z-index: 1000;
+  background: var(--surface);
+  padding: 10px 14px;
+  border-radius: 6px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  font-size: 13px;
+  color: var(--text-primary);
+  overflow-y: auto;
+}
+
+/* Three corners, so the wider metrics panel cannot collide with the controls
+   or the legend the way two right-hand panels used to. */
+#metrics  { top: 10px; left: 10px; width: 310px; max-height: calc(100vh - 20px); }
+#controls { top: 10px; right: 10px; width: 250px; max-height: calc(100vh - 20px); }
+#legend   { bottom: 20px; right: 10px; min-width: 150px; max-width: 240px; max-height: 60vh; }
+
+/* Narrow windows: the panel narrows and shares the height, but is never
+   hidden — a metrics panel that silently disappears below some window width
+   just looks broken. */
+@media (max-width: 900px) {
+  #metrics  { width: 250px; max-height: 56vh; }
+  #controls { width: 210px; max-height: 40vh; }
+  #legend   { max-height: 34vh; }
+}
+
+/* --- controls ----------------------------------------------------------- */
+#controls label { display: block; margin: 3px 0; cursor: pointer; }
+#controls hr { border: none; border-top: 1px solid var(--hairline); margin: 10px 0 8px; }
+#controls .status { min-height: 14px; margin-top: 6px; font-size: 11px; color: var(--text-muted); }
+#controls .ov-swatch {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  margin-right: 3px;
+  vertical-align: -1px;
+  border-radius: 2px;
+  border: 1px solid rgba(0, 0, 0, 0.35);
+}
+
+/* --- legend ------------------------------------------------------------- */
+#legend .sub { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+#legend .classes { margin: 8px 0 6px; }
+#legend .class { display: flex; align-items: center; gap: 6px; margin: 2px 0; }
+#legend .swatch {
+  width: 18px;
+  height: 14px;
+  flex: none;
+  border-radius: 2px;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+}
+#legend .label {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+#legend .note {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.35;
+}
+
+/* --- metrics panel ------------------------------------------------------ */
+.panel-head { margin-bottom: 10px; }
+.panel-title { font-size: 14px; font-weight: 600; line-height: 1.25; }
+.panel-sub { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+
+.block { margin: 0 0 9px; }
+.block h3 {
+  margin: 0 0 5px;
+  padding-top: 7px;
+  border-top: 1px solid var(--hairline);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--text-primary);
+}
+/* The definition sits with the heading so each block says what it means —
+   the whole point of the hazard / exposure / risk split. */
+.block-def {
+  display: block;
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text-secondary);
+}
+
+/* One small multiple per aggregated metric. */
+.metric { margin: 0 0 9px; }
+.metric-grid { display: grid; grid-template-columns: 1fr; gap: 0 14px; }
+
+/* Wide windows: the panel widens and the three risk charts pair up, so the
+   whole hazard → exposure → risk story fits without scrolling. */
+@media (min-width: 1500px) {
+  #metrics { width: 560px; }
+  .metric-grid { grid-template-columns: 1fr 1fr; }
+}
+.metric-head { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; }
+.metric-title { font-size: 11.5px; font-weight: 600; color: var(--text-primary); }
+.metric-unit { font-size: 10px; color: var(--text-muted); white-space: nowrap; }
+.metric-current {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--text-primary);
+  margin-bottom: 3px;
+}
+/* The delta rides on the headline value's line rather than taking its own. */
+.metric-current .delta { display: inline; font-size: 10.5px; font-weight: 400; margin-left: 4px; }
+
+/* Deltas carry an explicit sign and the words "vs baseline", so the colour is
+   reinforcement and never the only cue. */
+.delta { display: block; font-size: 11px; font-variant-numeric: tabular-nums; }
+.delta-good { color: var(--good); }
+.delta-bad  { color: var(--bad); }
+.delta-flat { color: var(--text-muted); }
+
+.split {
+  margin-top: 7px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.panel-note {
+  font-size: 10.5px;
+  line-height: 1.4;
+  color: var(--text-muted);
+  border-top: 1px solid var(--hairline);
+  padding-top: 8px;
+}
+
+/* --- scenario chart ----------------------------------------------------- */
+.chart { display: flex; flex-direction: column; gap: 2px; }
+
+/* One line per scenario: name, bar, value. Four of these charts have to fit
+   in the panel, so the row is a single 16px line rather than stacked. */
+.bar-row {
+  display: grid;
+  grid-template-columns: 84px 1fr 54px;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  padding: 1px 3px;
+  border: none;
+  border-radius: 3px;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.bar-row:hover { background: #f2f1ee; }
+.bar-row.is-selected { background: #eef4fd; }
+.bar-row:focus-visible { outline: 2px solid var(--text-primary); outline-offset: -2px; }
+
+.bar-label {
+  font-size: 10px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bar-row.is-selected .bar-label { color: var(--text-primary); font-weight: 600; }
+
+.bar-track { display: block; height: 9px; }
+.bar-fill {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  /* Rounded data-end only; the baseline end stays square so bars read as
+     anchored to zero rather than floating. */
+  border-radius: 0 4px 4px 0;
+}
+
+.bar-value {
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+  text-align: right;
+  white-space: nowrap;
+}
+.bar-row.is-selected .bar-value { color: var(--text-primary); font-weight: 600; }
+
+.hint { color: var(--text-muted); }
+.inline-note { border-top: none; padding-top: 4px; margin-top: 2px; }
+
+/* Key dot tying the exposure figures to the colours used on the map. */
+.asset-key {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  margin-right: 4px;
+  border: 1px solid rgba(0, 0, 0, 0.3);
+}
+
+/* --- popups ------------------------------------------------------------- */
+.pop-sub { color: var(--text-muted); font-size: 11px; }

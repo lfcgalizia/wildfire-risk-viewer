@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>probe</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="css/style.css" />
+<style>html,body{width:1400px;height:950px}</style>
+</head>
+<body>
+  <div id="map"></div>
+  <div id="metrics"></div>
+  <div id="controls"></div>
+  <div id="legend"></div>
+
+<script>
+window.__log = [];
+const log = (...a) => window.__log.push(a.map(String).join(' '));
+window.onerror = (m, s, l, c, e) => log('WINDOW_ERROR:', m, '@', s + ':' + l, e && e.stack);
+window.addEventListener('unhandledrejection', e => log('UNHANDLED_REJECTION:', e.reason, e.reason && e.reason.stack));
+const _err = console.error; console.error = (...a) => { log('CONSOLE_ERROR:', ...a.map(String)); _err(...a); };
+const _warn = console.warn; console.warn = (...a) => { log('CONSOLE_WARN:', ...a.map(String)); _warn(...a); };
+</script>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/proj4@2.9.0/dist/proj4.js"></script>
+<script src="https://unpkg.com/georaster@1.6.0"></script>
+<script src="https://unpkg.com/georaster-layer-for-leaflet@4.1.2"></script>
+<script src="js/app.js?v=probe8"></script>
+
+<script>
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const post = (p, b) => fetch(p, { method: 'POST', body: b });
+const rasterLayers = () => Object.values(map._layers).filter(l => l instanceof GeoRasterLayer);
+
+function paintedHash() {
+  let total = 0, tiles = 0;
+  rasterLayers().forEach(l => {
+    if (!l._container) return;
+    l._container.querySelectorAll('canvas').forEach(cv => {
+      if (!cv.width || !cv.height) return;
+      let d;
+      try { d = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data; } catch (e) { return; }
+      tiles++;
+      let h = 0;
+      for (let i = 0; i < d.length; i += 97 * 4) h = (h * 31 + d[i] + 3*d[i+1] + 7*d[i+2] + 11*d[i+3]) >>> 0;
+      total = (total ^ h) >>> 0;
+    });
+  });
+  return { hash: total, tiles };
+}
+
+// Sample the colours the exposure canvas renderer actually painted, so we can
+// tell a real ramp from a single flat fill.
+function vectorFillColours() {
+  const seen = new Map();
+  const cv = document.querySelector('.leaflet-overlay-pane canvas');
+  if (!cv) return seen;
+  const d = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data;
+  for (let i = 0; i < d.length; i += 4) {
+    if (d[i + 3] < 40) continue;
+    const k = `${d[i]},${d[i+1]},${d[i+2]}`;
+    seen.set(k, (seen.get(k) || 0) + 1);
+  }
+  return seen;
+}
+
+const hexToRgb = h => [1,3,5].map(i => parseInt(h.substr(i,2),16)).join(',');
+
+// Count pixels painted in exactly the ramp's steps — the fuel-break fills
+// dominate the canvas by area, so a top-N histogram hides whether the ramp
+// rendered at all.
+function rampPixels() {
+  const want = new Map(VALUE_RAMP.map(h => [hexToRgb(h), 0]));
+  const cv = document.querySelector('.leaflet-overlay-pane canvas');
+  if (!cv) return want;
+  const d = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data;
+  for (let i = 0; i < d.length; i += 4) {
+    if (d[i + 3] < 40) continue;
+    const k = `${d[i]},${d[i+1]},${d[i+2]}`;
+    if (want.has(k)) want.set(k, want.get(k) + 1);
+  }
+  return want;
+}
+function logRamp(tag) {
+  const p = rampPixels();
+  const used = [...p.entries()].filter(([, n]) => n > 0);
+  log(`  ${tag} ramp steps painted = ${used.length}/${VALUE_RAMP.length}`);
+  log('    ' + [...p.entries()].map(([c, n]) => `${c}=${n}`).join('  '));
+}
+
+const shoot = async (name) => {
+  const cv = document.querySelector('.leaflet-overlay-pane canvas');
+  if (!cv) { log('  no overlay canvas to capture for ' + name); return; }
+  await fetch('/shot/' + name, { method: 'POST', body: cv.toDataURL('image/png') });
+  log('  captured ' + name + ' (' + cv.width + 'x' + cv.height + ')');
+};
+
+async function waitFor(cond, label, timeout) {
+  const t0 = Date.now();
+  while (Date.now() - t0 < timeout) { if (cond()) return true; await sleep(1000); }
+  log('TIMEOUT: ' + label);
+  return false;
+}
+const statusIdle = () => {
+  const s = (document.getElementById('status') || {}).textContent || '';
+  return s === '' || /baseline/.test(s);
+};
+
+function setMode(id) { document.querySelector(`input[name=mode][value="${id}"]`).click(); }
+function setScenario(id) { document.querySelector(`input[name=scenario][value="${id}"]`).click(); }
+
+function metricCharts() {
+  return [...document.querySelectorAll('#metrics .metric')].map(m => ({
+    title: m.querySelector('.metric-title').textContent.trim(),
+    unit: m.querySelector('.metric-unit').textContent.trim(),
+    current: m.querySelector('.metric-current').textContent.replace(/\s+/g,' ').trim(),
+    bars: m.querySelectorAll('.bar-row').length,
+    labelled: [...m.querySelectorAll('.bar-value')].every(v => v.textContent.trim().length > 0),
+    selected: (m.querySelector('.bar-row.is-selected') || {}).dataset?.scenario || 'none',
+  }));
+}
+function tiles(){ return []; }
+
+(async () => {
+  try {
+    await waitFor(() => typeof map !== 'undefined', 'boot', 30000);
+    await waitFor(() => paintedHash().tiles > 0, 'initial raster', 180000);
+    await waitFor(() => typeof stats !== 'undefined' && stats !== null, 'stats', 60000);
+    await waitFor(() => buildingsLayer !== null && forestLayer !== null, 'vectors', 180000);
+    await sleep(8000);
+
+    log('=== MODES PRESENT ===');
+    log('  ' + [...document.querySelectorAll('input[name=mode]')].map(i => i.value).join(', '));
+
+    log('=== METRICS PANEL (bau) ===');
+    log('  metrics panel visible = ' + (document.getElementById('metrics').offsetParent !== null));
+    metricCharts().forEach(m => log(`  [${m.title}] (${m.unit}) current="${m.current}" bars=${m.bars} allLabelled=${m.labelled} sel=${m.selected}`));
+
+    log('=== SWITCH SCENARIO -> combined_full ===');
+    setScenario('combined_full');
+    await waitFor(statusIdle, 'load', 180000);
+    await sleep(8000);
+    metricCharts().forEach(m => log(`  [${m.title}] current="${m.current}" sel=${m.selected}`));
+
+    log('=== MODE: exposure ===');
+    setMode('exposure');
+    await sleep(9000);
+    log('  raster layers on map = ' + rasterLayers().length + ' (expect 0)');
+    (() => {
+      const want = { '42,120,214':'buildings blue', '0,131,0':'forest green' };
+      const cv = document.querySelector('.leaflet-overlay-pane canvas');
+      const d = cv.getContext('2d').getImageData(0,0,cv.width,cv.height).data;
+      const c = {}; Object.keys(want).forEach(k => c[k]=0);
+      for (let i=0;i<d.length;i+=4){ if(d[i+3]<40) continue; const k=`${d[i]},${d[i+1]},${d[i+2]}`; if(k in c) c[k]++; }
+      log('  asset colours painted = ' + Object.entries(c).map(([k,n])=>`${want[k]}:${n}`).join('  '));
+    })();
+    await shoot('exposure');
+    log('  legend title = ' + document.querySelector('#legend strong').textContent);
+
+    log('=== MODE: risk ===');
+    setMode('risk');
+    await sleep(9000);
+    log('  raster layers on map = ' + rasterLayers().length + ' (expect 0)');
+    logRamp('risk');
+    await shoot('risk');
+    log('  legend title = ' + document.querySelector('#legend strong').textContent);
+
+    log('=== MODE: hazard_delta ===');
+    setMode('hazard_delta');
+    await waitFor(statusIdle, 'delta load', 180000);
+    await sleep(9000);
+    log('  raster layers on map = ' + rasterLayers().length + ' (expect 1)');
+    log('  legend rows = ' + JSON.stringify([...document.querySelectorAll('#legend .label')].map(e=>e.textContent.trim())));
+
+    log('=== BACK TO HAZARD + panel overlap check ===');
+    setMode('hazard');
+    await waitFor(statusIdle, 'hazard load', 180000);
+    await sleep(9000);
+    log('  raster layers on map = ' + rasterLayers().length + ' (expect 1)');
+    const r = id => { const b = document.getElementById(id).getBoundingClientRect();
+                      return {id, x:Math.round(b.x), y:Math.round(b.y), w:Math.round(b.width), h:Math.round(b.height),
+                              right:Math.round(b.right), bottom:Math.round(b.bottom)}; };
+    const boxes = ['metrics','controls','legend'].map(r);
+    boxes.forEach(b => log(`  ${b.id.padEnd(9)} x=${b.x} y=${b.y} w=${b.w} h=${b.h} right=${b.right} bottom=${b.bottom}`));
+    const hit = (a,b) => !(a.right<=b.x||b.right<=a.x||a.bottom<=b.y||b.bottom<=a.y);
+    for (let i=0;i<boxes.length;i++) for (let j=i+1;j<boxes.length;j++)
+      log(`  overlap ${boxes[i].id}/${boxes[j].id} = ${hit(boxes[i],boxes[j])}`);
+    log('  viewport ' + window.innerWidth + 'x' + window.innerHeight);
+    const m = document.getElementById('metrics');
+    log('  metrics scrollHeight=' + m.scrollHeight + ' clientHeight=' + m.clientHeight +
+        ' overflowing=' + (m.scrollHeight > m.clientHeight));
+  } catch (e) {
+    log('HARNESS_ERROR: ' + e + ' ' + (e && e.stack));
+  }
+  await post('/report', window.__log.join('\n'));
+  await post('/done', 'done');
+})();
+</script>
+</body>
+</html>
